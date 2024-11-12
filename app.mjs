@@ -1,6 +1,7 @@
 import express from "express";
 import connectionPool from "./utils/db.mjs"; //สำหรับทำ query
 import cors from "cors"; //สำหรับ vercel
+import postValidation from "./Middlewear/post.validation.mjs";
 const app = express();
 const port = process.env.PORT || 4000;
 app.use(cors());
@@ -13,29 +14,20 @@ app.get("/demo", (req, res) => {
 });
 
 //API for GET--------------------------------------------
-// app.get("/posts", async (req, res) => {
-//   let result;
-//   try {
-//     result = await connectionPool.query("select * from posts"); //จุดสำคัญคือ query
-//   } catch (error) {
-//     console.log(error);
-//     return res.status(500).json({ message: `Server not respons: ${error}` });
-//   }
-//   return res.status(200).json({ data: result.rows });
-// });
 app.get("/posts/:postId", async (req, res) => {
+  //1.เข้าถึง req --------------------------------------------------
   const postIdFromClient = req.params.postId;
+  //2. เขียน query -->>>>> database >>>>>--------------------------
   try {
-    const result = await connectionPool.query(
-      "select * from posts where id=$1",
-      [postIdFromClient]
-    );
+    const result = await connectionPool.query("select * from posts where id=$1" , [postIdFromClient]);
+  //3.return res -------------------------------------------------
     return res.status(200).json({ data: result.rows });
   } catch (error) {
     return res.status(500).json({ message: "Sever not response" });
   }
 });
-//get query params.....................
+//get query params.......................................
+
 app.get("/posts", async (req, res) => {
   //กำหนดตัวแปรสำหรับเงื่อนไขต่างๆ
   /**
@@ -60,10 +52,10 @@ keyword: (Optional) ค้นหาบทความโดยใช้ Title, D
   const PAGE_SIZE = 5;
   const offset = (page - 1) * PAGE_SIZE; //เอาไว้ช้ามข้อมูลในหน้าที่แล้ว เช่น ถ้าเข้าหน้า 2 ก็จะข้ามข้อมูล 5 ชุด ถ้าเป็นหน้า 3 ก็จะข้าม 10 ชุด
 
-  const totalPosts = 10; //มาจาก select count(*)
-  const totalPages = totalPosts / PAGE_SIZE;
-  const currentPage = page;
-  const nextPage = currentPage + 1;
+  // const totalPosts = 10; //มาจาก select count(*)
+  // const totalPages = totalPosts / PAGE_SIZE;
+  // const currentPage = page;
+  // const nextPage = currentPage + 1;
 
   //1.ทำ default query หรือส่วนหัวของคิวรี่ เลือกข้อมูลที่เราจะส่งให้ client โดย values จะกำหนดเป็นอาเรย์เปล่า
   //+แก้ * ให้เป็นชุดข้อมูลที่เราจะให้
@@ -92,14 +84,16 @@ keyword: (Optional) ค้นหาบทความโดยใช้ Title, D
 
   try {
     const result = await connectionPool.query(query, values);
-    return res.json({ data: result.rows });
+    //.query("select * form posts where id= $1", [targetId])
+    return res.status(200).json({ data: result.rows });
   } catch (error) {
+    console.log(error);
     return res.json({ message: error.message });
   }
 });
 
 //API for POST-------------------------------------------
-app.post("/posts", async (req, res) => {
+app.post("/posts", [postValidation], async (req, res) => {
   //1. เข้าถึง req.body
   const newAssignment = {
     ...req.body,
@@ -107,7 +101,9 @@ app.post("/posts", async (req, res) => {
   //2. ทำ query post
   try {
     connectionPool.query(
-      `insert into posts (title, image, category_id, description, content, status_id) values ($1,$2,$3,$4,$5,$6)`,
+      `insert into 
+      posts (title, image, category_id, description, content, status_id) 
+      values ($1,$2,$3,$4,$5,$6)`,
       [
         newAssignment.title,
         newAssignment.image,
@@ -128,7 +124,7 @@ app.post("/posts", async (req, res) => {
 });
 
 //API for PUT--------------------------------------------
-app.put("/posts/:postId", async (req, res) => {
+app.put("/posts/:postId",[postValidation], async (req, res) => {
   //ติด error: null value in column \"image\" of relation \"posts\" violates not-null constraint"
   const postIdFromClient = req.params.postId;
   const updatedPost = { ...req.boby };
@@ -153,7 +149,7 @@ app.put("/posts/:postId", async (req, res) => {
 
   return res.status(201).json({ message: "Update post successfully" });
 });
-//API for DELETE---------------------------------------------------------------
+//API for DELETE-----------------------------------------
 app.delete("/posts/:postId", async (req, res) => {
   const postIdFromClient = req.params.postId;
   try {
@@ -172,3 +168,5 @@ app.delete("/posts/:postId", async (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running at ${port}`);
 });
+
+//Create Read Update Delete
