@@ -13,7 +13,6 @@ app.get("/demo", (req, res) => {
 });
 
 //API for GET--------------------------------------------
-//get all..............................
 // app.get("/posts", async (req, res) => {
 //   let result;
 //   try {
@@ -24,7 +23,6 @@ app.get("/demo", (req, res) => {
 //   }
 //   return res.status(200).json({ data: result.rows });
 // });
-//get id...............................
 app.get("/posts/:postId", async (req, res) => {
   const postIdFromClient = req.params.postId;
   try {
@@ -56,21 +54,25 @@ keyword: (Optional) ค้นหาบทความโดยใช้ Title, D
 
 เอาตัวแปรไปแทนที่ใน qurey.(qurey_function, value )
    */
-  const category = req.query.category;
-  const keyword = req.query.keyword;
+  const category = req.query.category || "";
+  const keyword = req.query.keyword || "";
   const page = req.query.page || 1;
   const PAGE_SIZE = 5;
   const offset = (page - 1) * PAGE_SIZE; //เอาไว้ช้ามข้อมูลในหน้าที่แล้ว เช่น ถ้าเข้าหน้า 2 ก็จะข้ามข้อมูล 5 ชุด ถ้าเป็นหน้า 3 ก็จะข้าม 10 ชุด
 
-  const totalPosts = 10  //มาจาก select count(*)
+  const totalPosts = 10; //มาจาก select count(*)
   const totalPages = totalPosts / PAGE_SIZE;
   const currentPage = page;
   const nextPage = currentPage + 1;
 
+  //1.ทำ default query หรือส่วนหัวของคิวรี่ เลือกข้อมูลที่เราจะส่งให้ client โดย values จะกำหนดเป็นอาเรย์เปล่า
+  //+แก้ * ให้เป็นชุดข้อมูลที่เราจะให้
   let query =
     "select * from posts inner join categories on posts.category_id = categories.id";
   let values = [];
-
+  //2.ทำ qurey สำหรับ parameter ที่ client ส่งมา โดยจะมีเงื่อนไขดักว่า client ส่งพารามิเตอร์ตัวไหนมาบ้าง จากนั้นจะนำคิวรี่พารามิเตอร์ไปต่อท้ายด้วย query += "_where..."
+  //+ตรง _where ต้องเว้นว่างไว้เพื่อให้เวลาคิวรี่ไปต่อกันจะได้ไม่ผิด syntax ไม่อย่างนั้นจะเป็น ...categories.idwhere...
+  //เงื่อนไขถามว่า มี keyword หรือ category หรือมีทั้งคู่ หรือไม่มีเลย จากนั้นจะส่งคิวรี่ใหม่ไปต่อท้ายตามเงื่อนไข
   if (keyword && category) {
     query +=
       " where categories.name ilike $1 and title ilike $2 limit $3 offset $4";
@@ -85,6 +87,9 @@ keyword: (Optional) ค้นหาบทความโดยใช้ Title, D
     query += " limit $1 offset $2";
     values = [PAGE_SIZE, offset];
   }
+  //3.ทำคิวรี่สำหรับนับจำนวน posts ทั้งหมด เนื่องจาก requirement อยากให้เรานับ posts และเอามาคำนวนหา totalPage/
+  //4.เอาคิวรี่ count มาคำนวนหาค่าต่างๆ
+
   try {
     const result = await connectionPool.query(query, values);
     return res.json({ data: result.rows });
